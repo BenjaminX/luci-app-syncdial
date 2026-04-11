@@ -10,5 +10,5 @@ e=entry({"admin","network","macvlan_redial"},call("redial"),nil)
 e.leaf=true
 end
 function redial()
-os.execute("killall -9 pppd")
+os.execute("killall pppd")
 end
