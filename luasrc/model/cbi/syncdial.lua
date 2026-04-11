@@ -1,9 +1,9 @@
-local e=require"nixio.fs"
 require("luci.tools.webadmin")
-local e="mwan3 status | grep -c \"is online\""
-local e=io.popen(e,"r")
-local t=e:read("*a")
-e:close()
+local cmd = "for f in /var/run/mwan3track/vwan*/STATUS; do [ -f \"$f\" ] && [ \"$(cat $f)\" = \"online\" ] && echo ok; done 2>/dev/null | grep -c ok"
+local f = io.popen(cmd, "r")
+local t = f and f:read("*a") or "0"
+if f then f:close() end
+t = t:match("%d+") or "0"
 m=Map("syncdial",translate("Multi-Syncdial"),
 translate("Create multiple virtual WAN interfaces using macvlan driver for concurrent dialing")..
 " <br />"..translate("Current online interface count: ")..t)
