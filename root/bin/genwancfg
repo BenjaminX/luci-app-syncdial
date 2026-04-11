@@ -3,6 +3,11 @@
 #Copyright (C) 2016
 . /lib/functions.sh
 
+#获取接口的物理设备名（兼容新旧OpenWrt）
+get_ifname() {
+	uci -q get network.${1}.device || uci -q get network.${1}.ifname
+}
+
 #检测IP列表
 chk_ip_list="www.baidu.com 114.114.114.114 119.29.29.29"
 chk_ip6_list="2400:da00:2::29"
@@ -11,6 +16,13 @@ backupdev=$(uci get syncdial.config.devbackup)
 norun=$(echo $origfirewall|grep vwan)
 nomwan=$(uci get syncdial.config.nomwan)
 wanselect=$(uci get syncdial.config.wanselect)
+
+#检测网络配置格式：新版OpenWrt(21.02+)接口段使用device，旧版使用ifname
+if [ -n "$(uci -q get network.${wanselect}.device)" ]; then
+	IFOPT="device"
+else
+	IFOPT="ifname"
+fi
 wannum=$(uci get syncdial.config.wannum)
 oldframe=$(uci get syncdial.config.old_frame)
 bindwan=$(uci -q get syncdial.config.bindwan)
@@ -121,7 +133,7 @@ pppoe_if_add() {
 	NEW_MACADDR=$(openssl rand -hex 6 | sed 's/\(..\)/\1:/g; s/.$//')
 	#gen wan if
 	uci set network.${1}=interface
-	uci set network.${1}.ifname=${2}
+	uci set network.${1}.${IFOPT}=${2}
 	uci set network.${1}.proto=pppoe
 	uci set network.${1}.username=${3}
 	uci set network.${1}.password=${4}
@@ -129,7 +141,7 @@ pppoe_if_add() {
 	uci set network.${1}.macaddr=$NEW_MACADDR
 	[ "$ipv6" == "1" ] && {
 	uci set network.${1}_6=interface
-	uci set network.${1}_6.ifname=pppoe-${1}
+	uci set network.${1}_6.${IFOPT}=pppoe-${1}
 	uci set network.${1}_6.proto=dhcpv6
 	uci set network.${1}_6.metric=$((${5}+984))
 	uci set network.${1}_6.macaddr=$NEW_MACADDR
@@ -182,11 +194,11 @@ general_config_load() {
 	config_load 'network'
 	config_get pppoe_user $wanselect 'username'
 	config_get pppoe_password $wanselect 'password'
-	pppoe_ifname=$(uci get network.$wanselect.ifname)
+	pppoe_ifname=$(get_ifname $wanselect)
 	[ "$dial_type" -eq 2 ] && {
 		config_get pppoe_user2 $wanselect2 'username'
 		config_get pppoe_password2 $wanselect2 'password'
-		pppoe_ifname2=$(uci get network.$wanselect2.ifname)
+		pppoe_ifname2=$(get_ifname $wanselect2)
 	}
 
 }
@@ -253,7 +265,7 @@ uci set network.$wanselect.metric=40
 if [ "$wannum" -gt 0 ]; then
 	[ "$old_frame" -eq 1 ] && {
 		uci set network.$wanselect.proto=none
-		ifname=$(uci get network.$wanselect.ifname)
+		ifname=$(get_ifname $wanselect)
 		for i in $(seq 1 $wannum)
 		do
 			ip link add link $ifname name macvlan$i type macvlan
@@ -294,7 +306,7 @@ fi
 	if [ "$wannum2" -gt 0 ]; then
 		[ "$old_frame" -eq 1 ] && {
 			uci set network.$wanselect2.proto=none
-			ifname2=$(uci get network.$wanselect2.ifname)
+			ifname2=$(get_ifname $wanselect2)
 			for i in $(seq 1 $wannum2)
 			do
 				ip link add link $ifname2 name macvlan$(($wannum+$i)) type macvlan
